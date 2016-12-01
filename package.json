@@ -1,0 +1,17 @@
+{
+	"name": "twi",
+	"version": "0.0.1",
+	"description": "The Wikipedia Index",
+	"author": "Graham Agnew <graham.agnew@gmail.com>",
+	"main": "twi.js",
+	"license": "GPL",
+	"scripts": {
+		"start": "node twi.js"
+	},
+	"dependencies": {
+		"mediawiki": "^0.0.14",
+		"redis": "^2.6.2",
+		"word-freq": "^0.0.8",
+		"bluebird": "^3.4.6"
+	}
+}
