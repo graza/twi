@@ -3,10 +3,10 @@
 	"version": "0.0.1",
 	"description": "The Wikipedia Index",
 	"author": "Graham Agnew <graham.agnew@gmail.com>",
-	"main": "twi.js",
+	"main": "worker.js",
 	"license": "GPL",
 	"scripts": {
-		"start": "node twi.js"
+		"start": "node worker.js"
 	},
 	"dependencies": {
 		"mediawiki": "^0.0.14",

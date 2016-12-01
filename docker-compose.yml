@@ -1,6 +1,6 @@
 version: '2'
 services:
-  twi:
+  worker:
     build: .
     volumes:
      - .:/usr/src/app
