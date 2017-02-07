@@ -30,3 +30,11 @@ And then I run these three commands:
 Note that there's a bug in calc_weights.js that means you have to hit control-C when it gets to the end (i.e. prints 0 representing the end of the Redis cursor).
 
 More documentation about the structure of the Redis keys is TBC.
+
+The following Redis keys are created/updated as a result of processing a page:
+* term:<term> - Sorted set of pageid and term frequency values for <term>
+* cterm:<term> - Number of pages containing <term>
+* page:<pageid> - info property of Wikipedia page <pageid>
+* pages - Count of the number of pages indexed
+* dl:<pageid> - Document length of page <pageid>
+* dltot - Sum total of all document lengths

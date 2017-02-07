@@ -9,6 +9,7 @@
  * cterm:<term> - Number of pages containing <term>
  * page:<pageid> - info property of Wikipedia page <pageid>
  * pages - Count of the number of pages indexed
+ * dl:<pageid> - Document length of page <pageid>
  *
  * The weight for a term within a page can be calculated
  * by fetching the following:
@@ -41,62 +42,77 @@ bot.settings.userAgent = "twi/0.1 (graham.agnew@gmail.com)";
 // for processing.  If the query has a 'continue' property,
 // run the next query by merging that into the query.
 function getlinks(query, cb) {
-	// Make sure the query will fetch the info property
-	query.action = 'query';
-	query.prop = 'info';
-	query.inprop = 'url';
-	bot.get(query).complete((response) => {
-		console.log(response);
-		var links = response.query.pages;
-		var l;
-		var reqs = [];
-		for (l in links) {
-			reqs.push((JSON.stringify(['getpage', links[l]])));
-		}
-		redis.lpushAsync('worker', reqs);
-		// Fetch next set of pages if there is more available.
-		if (response.continue) {
-			getlinks(Object.assign(query, response.continue));
-			//redis.lpush('worker', JSON.stringify(['getlinks', Object.assign(query, response.continue)]));
-		}
+	return new Promise((resolve, reject) => {
+		// Make sure the query will fetch the info property
+		query.action = 'query';
+		query.prop = 'info';
+		query.inprop = 'url';
+		bot.get(query).complete((response) => {
+			console.log(response);
+			var links = response.query.pages;
+			var l;
+			var reqs = [];
+			for (l in links) {
+				reqs.push((JSON.stringify(['getpage', links[l]])));
+			}
+			redis.lpushAsync('worker', reqs).then(() => {
+				// Fetch next set of pages if there is more available.
+				if (response.continue) {
+					resolve(getlinks(Object.assign(query, response.continue)));
+					//redis.lpush('worker', JSON.stringify(['getlinks', Object.assign(query, response.continue)]));
+				}
+				else {
+					resolve();
+				}
+			});
+		});
 	});
 }
 
 // Get the text of the page
 function getpage(info) {
-	redis.hmset("page:" + info.pageid, info);
-	bot.get({
-		action: "query",
-		prop: "extracts",
-		pageids: info.pageid,
-		explaintext: "t",
-		exsectionformat: "plain"
-	}).complete(function (response) {
-		//console.log(response);
-		var page = response.query.pages[info.pageid];
-		if (page.extract) {
-			//redis.incr("pages");
-			processpage(page);
-		}
-		else {
-			console.log("no extract for " + page.title)
-		}
+	return new Promise((resolve, reject) => {
+		redis.hmsetAsync("page:" + info.pageid, info)
+		.then(() => {
+			bot.get({
+				action: "query",
+				prop: "extracts",
+				pageids: info.pageid,
+				explaintext: "t",
+				exsectionformat: "plain"
+			}).complete(function (response) {
+				//console.log(response);
+				var page = response.query.pages[info.pageid];
+				console.log(page.title);
+				if (page.extract) {
+					//redis.incr("pages");
+					resolve(processpage(page.id, page.extract));
+				}
+				else {
+					console.log("no extract for " + page.title);
+					resolve();
+				}
+			});
+		});
 	});
 }
 
 // Put the page into Redis
-function processpage(page) {
-	console.log(page.title);
-	var freq = WF.freq(page.extract);
+function processpage(pageid, text) {
+	var freq = WF.freq(text);
 	var dl = 0;
+	var promises = [];
 	for (t in freq) {
-		redis.zadd("term:" + t, freq[t], page.pageid);
-		redis.incr("cterm:" + t);
+		promises.push(redis.zaddAsync("term:" + t, freq[t], pageid));
+		promises.push(redis.incrAsync("cterm:" + t));
 		dl += freq[t];
 	}
 	// dl - Document Length is the sum of the term frequency
-	redis.set("dl:" + page.pageid, dl);
-	update_dlavg(dl);
+	promises.push(redis.setAsync("dl:" + pageid, dl));
+	promises.push(redis.incrAsync("pages"));
+	promises.push(redis.incrbyAsync("dltot", dl));
+	//update_dlavg(dl);
+	return Promise.all(promises);
 }
 
 function update_dlavg(dl) {
@@ -122,27 +138,32 @@ redisq.on("error", function (err) {
 });
 
 function server(queue) {
-	console.log('listening on queue ' + queue);
+	//console.log('listening on queue ' + queue);
 	redisq.brpopAsync(queue, 0)
 	.then((msg) => {
-		console.log(msg);
+		//console.log(msg);
 		req = JSON.parse(msg[1]);
+		var p;
 		switch (req[0]) {
 		case 'getlinks':
-			getlinks(req[1]);
+			p = getlinks(req[1]);
 			break;
 		case 'getpage':
-			getpage(req[1]);
+			p = getpage(req[1]);
+			break;
+		case 'processpage':
+			p = processpage(req[1], req[2]);
 			break;
 		case 'flush':
-			redis.flushdb();
+			p = redis.flushdbAsync();
 			break;
 		default:
 			console.log('Unexpected request: ' + req);
+			server(queue);
 			break;
 		}
 		// Go back to servicing the queue
-		server(queue);
+		p.then(() => { server(queue); });
 	});
 }
 server('worker');
