@@ -78,42 +78,41 @@ function handleEntry(mode, index, text) {
 }
 
 function processFile(mode, file) {
-	var rs = Fs.createReadStream(file);
-	var rl = Readline.createInterface({ input: rs });
+	return new Promise((resolve, reject) => {
+		var rs = Fs.createReadStream(file);
+		var rl = Readline.createInterface({ input: rs });
 
-	var index = '';
-	var text = '';
-	rl.on('line', (line) => {
-		var input = line.match(/^\.I (\d+)$/);
-		if (input) {
-			// If text has been read, process it
-			if (text.length > 0) {
-				//console.log(`Read for index ${index}: ${text.split(/\s*(\.)\.*\s*|\s+/)}`);
-				handleEntry(mode, index, text);
+		var promises = [];
+		var index = '';
+		var text = '';
+		rl.on('line', (line) => {
+			var input = line.match(/^\.I (\d+)$/);
+			if (input) {
+				// If text has been read, process it
+				if (text.length > 0) {
+					//console.log(`Read for index ${index}: ${text.split(/\s*(\.)\.*\s*|\s+/)}`);
+					promises.push(handleEntry(mode, index, text));
+				}
+				index = input[1];
 			}
-			index = input[1];
-		}
-		else if (line.match(/^.W$/)) {
-			// Clear the text buffer
-			text = '';
-		}
-		else {
-			// Append the line to the text buffer, making sure there's a space at the end
-			text += line + ' ';
-		}
-	});
-	rl.on('close', () => {
-		if (text.length > 0) {
-			handleEntry(mode, index, text)
-			.then(() => {
-				redis.quit();
-			});
-			//console.log(`Read for index ${index}: ${text.split(/\s*(\.)\.*\s*|\s+/)}`);
-		}
-		else {
-			redis.quit();
-		}
-		console.log(`end of file`);
+			else if (line.match(/^.W$/)) {
+				// Clear the text buffer
+				text = '';
+			}
+			else {
+				// Append the line to the text buffer, making sure there's a space at the end
+				text += line + ' ';
+			}
+		});
+		rl.on('close', () => {
+			if (text.length > 0) {
+				promises.push(handleEntry(mode, index, text));
+				//console.log(`Read for index ${index}: ${text.split(/\s*(\.)\.*\s*|\s+/)}`);
+			}
+			console.log(`end of file`);
+			Promise.all(promises)
+			.then(() => { resolve(); });		
+		});
 	});
 }
 
@@ -123,11 +122,17 @@ switch (process.argv[2]) {
 case 'load':
 	redis.flushdbAsync()
 	.then(() => {
-		processFile('load', 'med/MED.ALL');
+		return processFile('load', 'med/MED.ALL');
+	})
+	.then(() => {
+		redis.quit();
 	});
 	break;
 case 'query':
-	processFile('query', 'med/MED.QRY');
+	processFile('query', 'med/MED.QRY')
+	.then(() => {
+		redis.quit();
+	});
 	break;
 default:
 	console.error('invalid mode');

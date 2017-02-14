@@ -25,7 +25,7 @@ function iterate_terms(cursor) {
 		var promises = [];
 		if (value[1]) {
 			value[1].forEach(function(term) {
-				promises.push(calculate_weights(term, 0));
+				promises.push(calculate_weights(term));
 			});
 		}
 		console.log(value[0]);
@@ -82,18 +82,25 @@ function calculate_weights(term) {
 		});
 	}
 	// For the term, we need the number of docs that contain the term
-	var cterm = 'c' + term;
-	return redis.getAsync(cterm).then((ni) => {
+	//var cterm = 'c' + term;
+	//return redis.getAsync(cterm).then((ni) => {
+	return redis.zcardAsync(term).then((ni) => {
 		return weights_cursor(parseInt(ni), 0);
 	});
 }
 
 // Caculate weights for BM25/Okapi algorithm
-function bm25_term_weight(tf, N, ni, dl, dlavg) {
+// Parameters:
+//   tf    - The term frequency within the document
+//   N     - Total number of documents
+//   n     - Number of documents that contain the term
+//   dl    - Document length
+//   dlavg - Average document length
+function bm25_term_weight(tf, N, n, dl, dlavg) {
 	var k1 = 0.35;
 	var b = 0.8;
 	//console.log(tf, N, ni, dl, dlavg);
-	return (tf * Math.log((N - ni + 0.5)/(ni + 0.5)))/(tf + k1 * ((1 - b) + b * dl / dlavg));
+	return (tf * Math.log((N - n + 0.5)/(n + 0.5)))/(tf + k1 * ((1 - b) + b * dl / dlavg));
 }
 
 Promise.all([

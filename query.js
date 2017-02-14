@@ -14,7 +14,7 @@ Bluebird.promisifyAll(Redis.Multi.prototype);
 
 // Initialise globals
 var redis = Redis.createClient();
-redis.on("error", function (err) {
+redis.on("error", (err) => {
 	console.log("Error " + err);
 });
 
@@ -53,7 +53,7 @@ function findDocs(query) {
 				i += 2; // Move to next pair
 			}
 		}
-		var simkeys = Object.keys(sim).sort(function(a,b){
+		var simkeys = Object.keys(sim).sort((a,b) => {
 			return sim[b] - sim[a];
 		});
 		return simkeys;

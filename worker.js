@@ -30,7 +30,7 @@ Bluebird.promisifyAll(Redis.Multi.prototype);
 
 // Initialise globals
 var redis = Redis.createClient({host: "redis"});
-redis.on("error", function (err) {
+redis.on("error", (err) => {
 	console.log("Error " + err);
 });
 
@@ -80,7 +80,7 @@ function getpage(info) {
 				pageids: info.pageid,
 				explaintext: "t",
 				exsectionformat: "plain"
-			}).complete(function (response) {
+			}).complete((response) => {
 				//console.log(response);
 				var page = response.query.pages[info.pageid];
 				console.log(page.title);
@@ -97,35 +97,100 @@ function getpage(info) {
 	});
 }
 
+function frequencies(text) {
+	var stems = WF.stem(text);
+	const window = 4;
+	var tfreq = {};
+	var bfreq = {};
+	for (var i = 0; i < stems.length; i++) {
+		// Update term frequency
+		if (tfreq.hasOwnProperty(stems[i])) tfreq[stems[i]] += 1;
+		else tfreq[stems[i]] = 1;
+		// Update bigram frequencies
+		for (var j = Math.max(0, i - window); j < i; j++) {
+			var bigram = stems[j] + ':' +stems[i];
+			var weight = 1/(i - j);
+			if (bfreq.hasOwnProperty(bigram)) bfreq[bigram] += weight;
+			else bfreq[bigram] = weight;
+		}
+	}
+	return {
+		terms: tfreq,
+		bigrams: bfreq
+	}	
+}
+
 // Put the page into Redis
 function processpage(pageid, text) {
-	var freq = WF.freq(text);
 	var dl = 0;
 	var promises = [];
-	for (t in freq) {
-		promises.push(redis.zaddAsync("term:" + t, freq[t], pageid));
-		promises.push(redis.incrAsync("cterm:" + t));
-		dl += freq[t];
+	//var freq = WF.freq(text);
+	var freq = frequencies(text);
+	for (t in freq.terms) {
+		promises.push(redis.zaddAsync("term:" + t, freq.terms[t], pageid));
+		//promises.push(redis.incrAsync("cterm:" + t));
+		dl += freq.terms[t];
+	}
+	for (t in freq.bigrams) {
+		promises.push(redis.zaddAsync("term:" + t, freq.bigrams[t], pageid));
+		//promises.push(redis.incrAsync("cterm:" + t));
+		//dl += freq.bigrams[t];
 	}
 	// dl - Document Length is the sum of the term frequency
 	promises.push(redis.setAsync("dl:" + pageid, dl));
 	promises.push(redis.incrAsync("pages"));
 	promises.push(redis.incrbyAsync("dltot", dl));
-	//update_dlavg(dl);
 	return Promise.all(promises);
 }
 
-function update_dlavg(dl) {
-	// Time to update the document length and document length average
-	// Uses a lua script that runs in Redis to do so.  This makes the
-	// update of dlavg and pages an atomic operation.
-	var script = "local pages = tonumber(redis.call('GET', 'pages') or 0)\n\
-	local dlavg = tonumber(redis.call('GET', 'dlavg') or 0)\n\
-	local dlavg = (pages * dlavg + tonumber(ARGV[1])) / (pages + 1)\n\
-	redis.call('SET', 'dlavg', dlavg)\n\
-	redis.call('INCR', 'pages')";
-	redis.eval(script, 0, dl, function(err, val) {
-		if (err) { console.error('script failed ' + err); }
+function finddocs(query) {
+	var freq = WF.freq(query);
+	console.log(freq);
+
+	// Uses the Redis ZREVRANGEBYSCORE command to get the pageid-weight values
+	// and returns a Promise that will resolve to a two element array of the term
+	// and a hash of the pageid and corresponding weight values that have been fetched.
+	function getWeights(term) {
+		return redis.zrevrangebyscoreAsync('bm25:term:' + term, '+inf', 0, 'WITHSCORES')
+		.then((w) => {
+			var weights = {};
+			for (var i = 0; i < w.length; i += 2) {
+				weights[w[i]] = parseFloat(w[i+1]);
+			}
+			return [term, weights];
+		});
+	}
+
+	var promises = [];
+	var termweights = {};
+	for (var t in freq) {
+		promises.push(getWeights(t));
+	}
+
+	return Promise.all(promises)
+	.then((w) => {
+		//console.log("resolved promises: " + JSON.stringify(w));
+		// w is an array of the outcome of the getWeights promises
+		var sim = {};
+		for (var t of w) {
+			// Each t is array containing term plus an array of
+			// pageid-weight object.
+			var term = t[0];
+			var weights = t[1];
+			for (pageid in weights) {
+				// Initialise the similarity if needed
+				if (!sim[pageid]) sim[pageid] = 0;
+				// Multiply the weight by the frequency, and add it into the similarity
+				sim[pageid] += weights[pageid] * freq[term];
+			}
+		}
+		var pageids = Object.keys(sim).sort((a,b) => {
+			return sim[b] - sim[a];
+		});
+		return {
+			freq: freq,
+			pageids: pageids
+		};
 	});
 }
 
@@ -133,7 +198,7 @@ function update_dlavg(dl) {
 // This is because it's a blocking operation and can't be
 // run in conjunction with other Redis commands.
 var redisq = Redis.createClient({host: "redis"});
-redisq.on("error", function (err) {
+redisq.on("error", (err) => {
 	console.log("Error " + err);
 });
 
@@ -143,7 +208,7 @@ function server(queue) {
 	.then((msg) => {
 		//console.log(msg);
 		req = JSON.parse(msg[1]);
-		var p;
+		var p = undefined;
 		switch (req[0]) {
 		case 'getlinks':
 			p = getlinks(req[1]);
@@ -157,16 +222,27 @@ function server(queue) {
 		case 'flush':
 			p = redis.flushdbAsync();
 			break;
+		case 'finddocs':
+			p = finddocs(req[2])
+			.then((pageids) => {
+				return redis.lpushAsync(req[1], JSON.stringify(pageids));
+			});
+			break;
 		default:
 			console.log('Unexpected request: ' + req);
-			server(queue);
-			break;
+			return server(queue);
 		}
-		// Go back to servicing the queue
-		p.then(() => { server(queue); });
+		p.then(() => {
+			server(queue);
+		});
+	})
+	.catch((err) => {
+		console.error(err);
+		server(queue);
 	});
 }
 server('worker');
+console.log('worker started'); 
 
 // Example query to get the top 1000 articles
 query = ['getlinks', {
