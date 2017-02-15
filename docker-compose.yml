@@ -1,9 +1,18 @@
 version: '2'
 services:
-  worker:
-    build: .
+  web:
+    build: web
+    ports:
+     - 3838:3838
     volumes:
-     - .:/usr/src/app
+     - ./web/:/srv/shiny-server/twi/
+     - ./log/:/var/log/shiny-server/
+    depends_on:
+     - redis
+  worker:
+    build: worker
+    volumes:
+     - ./worker/:/usr/src/app/
     depends_on:
      - redis
   redis:

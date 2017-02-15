@@ -12,7 +12,7 @@ library(rredis)
 library(stringr)
 library(RJSONIO)
 
-redisConnect(nodelay = FALSE)
+redisConnect(host = 'redis', nodelay = FALSE)
 clientq <- paste0(
   "client",
   str_match_all(
