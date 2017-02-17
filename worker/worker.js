@@ -48,7 +48,7 @@ function getlinks(query, cb) {
 		query.prop = 'info';
 		query.inprop = 'url';
 		bot.get(query).complete((response) => {
-			console.log(response);
+			//console.log(response);
 			var links = response.query.pages;
 			var l;
 			var reqs = [];
@@ -126,6 +126,9 @@ function processpage(pageid, text) {
 	var promises = [];
 	//var freq = WF.freq(text);
 	var freq = frequencies(text);
+	promises.push(redis.setAsync("page:" + pageid + ":text", text));
+	//promises.push(redis.saddAsync("page:" + pageid + ":terms", Object.keys(freq.terms)));
+	//promises.push(redis.saddAsync("page:" + pageid + ":edges", Object.keys(freq.bigrams)));
 	for (t in freq.terms) {
 		promises.push(redis.zaddAsync("term:" + t, freq.terms[t], pageid));
 		//promises.push(redis.incrAsync("cterm:" + t));
@@ -143,53 +146,123 @@ function processpage(pageid, text) {
 	return Promise.all(promises);
 }
 
-function finddocs(query) {
-	var freq = WF.freq(query);
-	console.log(freq);
+// Find and rank documents
+function finddocs(query, termw, edgew) {
+	//var freq = WF.freq(query);
+	var freq = frequencies(query);
+	//console.log(`freq = ${JSON.stringify(freq)}, termw = ${termw}, edgew = ${edgew}`);
+
+	// Caculate weights for BM25/Okapi algorithm
+	// Parameters:
+	//   tf    - The term frequency within the document
+	//   N     - Total number of documents
+	//   n     - Number of documents that contain the term
+	//   dl    - Document length
+	//   dlavg - Average document length
+	function bm25_term_weight(tf, N, n, dl, dlavg) {
+		var k1 = 0.35;
+		var b = 0.8;
+		//console.log(tf, N, ni, dl, dlavg);
+		return (tf * Math.log((N - n + 0.5)/(n + 0.5)))/(tf + k1 * ((1 - b) + b * dl / dlavg));
+	}
+
+	// Returns a promise that resolves to [pageid, weight]
+	function calc_weight(tf, n, pageid) {
+		return redis.getAsync('dl:' + pageid)
+		.then((dl) => {
+			return [pageid, bm25_term_weight(tf, pages, n, parseFloat(dl), dlavg)];
+		});
+	}
 
 	// Uses the Redis ZREVRANGEBYSCORE command to get the pageid-weight values
 	// and returns a Promise that will resolve to a two element array of the term
 	// and a hash of the pageid and corresponding weight values that have been fetched.
-	function getWeights(term) {
-		return redis.zrevrangebyscoreAsync('bm25:term:' + term, '+inf', 0, 'WITHSCORES')
-		.then((w) => {
-			var weights = {};
+	function get_term_freq(term) {
+		return Promise.all([
+			redis.zcardAsync('term:' + term),
+			redis.zrevrangebyscoreAsync('term:' + term, '+inf', 0, 'WITHSCORES')
+		])
+		.then((nw) => {
+			var n = parseInt(nw[0]);
+			var w = nw[1];
+			// For each page id in w, need to get its document length
+			var promises = [];
 			for (var i = 0; i < w.length; i += 2) {
-				weights[w[i]] = parseFloat(w[i+1]);
+				promises.push(calc_weight(parseFloat(w[i+1]), n, w[i]));
 			}
-			return [term, weights];
+			return Promise.all(promises);
+		})
+		.then((page_weights) => {
+			//console.log(`get_term_freq(${term})=${JSON.stringify(page_weights)}`)
+			return [term, page_weights];
 		});
 	}
 
-	var promises = [];
-	var termweights = {};
-	for (var t in freq) {
-		promises.push(getWeights(t));
-	}
+	// Start by getting current global values for number of pages and average document length
+	var pages;
+	var dlavg;
+	return Promise.all([
+		redis.getAsync('pages'),
+		redis.getAsync('dltot')
+	]).then((value) => {
+		pages = parseInt(value[0]);
+		//console.log("pages " + pages);
+		dlavg = parseFloat(value[1]) / pages;
+		//console.log("dlavg " + dlavg);
 
-	return Promise.all(promises)
+		// iterate over the terms in the query;
+		var promises = [];
+		var termweights = {};
+		for (var t in freq.terms) {
+			promises.push(get_term_freq(t));
+		}
+		for (var t in freq.bigrams) {
+			promises.push(get_term_freq(t));
+		}
+
+		return Promise.all(promises);
+	})
 	.then((w) => {
 		//console.log("resolved promises: " + JSON.stringify(w));
 		// w is an array of the outcome of the getWeights promises
+		//console.log(`w=${JSON.stringify(w)}`);
 		var sim = {};
 		for (var t of w) {
 			// Each t is array containing term plus an array of
 			// pageid-weight object.
 			var term = t[0];
 			var weights = t[1];
-			for (pageid in weights) {
+			//console.log(`\nterm = ${term}\nweights = ${JSON.stringify(weights)}`);
+			for (page of weights) {
+				var pageid = page[0];
+				var weight = page[1];
+				var thisweight = 0;
+				//console.log(`\npageid = ${pageid}\nweight = ${weight}`);
 				// Initialise the similarity if needed
-				if (!sim[pageid]) sim[pageid] = 0;
 				// Multiply the weight by the frequency, and add it into the similarity
-				sim[pageid] += weights[pageid] * freq[term];
+				if (freq.terms.hasOwnProperty(term)) {
+					thisweight = weight * freq.terms[term] * termw;
+				}
+				else {
+					thisweight = weight * freq.bigrams[term] * edgew;
+				}
+				if (thisweight > 0) {
+					if (!sim.hasOwnProperty(pageid)) sim[pageid] = 0;
+					sim[pageid] += thisweight;
+				}
 			}
 		}
+		//console.log("sim = " + JSON.stringify(sim));
 		var pageids = Object.keys(sim).sort((a,b) => {
 			return sim[b] - sim[a];
 		});
+		var pageweights = [];
+		for (pageid of pageids) {
+			pageweights.push([pageid, sim[pageid]]);
+		}
 		return {
 			freq: freq,
-			pageids: pageids
+			pageids: pageweights
 		};
 	});
 }
@@ -223,7 +296,7 @@ function server(queue) {
 			p = redis.flushdbAsync();
 			break;
 		case 'finddocs':
-			p = finddocs(req[2])
+			p = finddocs(req[2], parseFloat(req[3]), parseFloat(req[4]))
 			.then((pageids) => {
 				return redis.lpushAsync(req[1], JSON.stringify(pageids));
 			});
