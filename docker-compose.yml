@@ -5,14 +5,11 @@ services:
     ports:
      - 3838:3838
     volumes:
-     - ./web/:/srv/shiny-server/twi/
      - ./log/:/var/log/shiny-server/
     depends_on:
      - redis
   worker:
     build: worker
-    volumes:
-     - ./worker/:/usr/src/app/
     depends_on:
      - redis
   redis:
@@ -20,4 +17,4 @@ services:
     ports:
      - 6379:6379
     volumes:
-     - ..:/data
+     - .:/data

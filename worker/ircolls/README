@@ -1,0 +1,52 @@
+-----------------------------------------------------------------------
+     Information Retrieval Test Collections -- \DOWN\IRCOLLS
+
+These information retrieval test collections are described in various
+books, articles, and technical reports from universities or research 
+laboratories around the world.  Only the most popular test collections 
+that I am familiar with and have been able to obtain are included.
+
+Collections include: adi (American Documentation Inst. set of 82
+documents, primarily useful for debugging programs), cacm (collection
+from CACM, used with permission of ACM), cisi (collection of highly
+cited articles identified by ISI, cran (articles in aeronautics from
+Cranfield experiments), med (1033 medical articles), npl (from British 
+National Physics Library), lisa (in separate directory, from University of 
+Shaffield, UK), rird (in separate directory, from Rutgers Univ.) and 
+time (also in a separate directory, from University of Massachusetts,
+but originally from Cornell Univ.).
+
+In most cases, the collections include the original text of the
+documents considered (in *.all) and of interest statements (in *.qry).
+However, in the "npl" case only document vectors (npl.dvr) and query
+vectors (npl.qvr), in relational form, are included.  Boolean queries
+are present in some cases (in *.bln) and if there are 2 versions they
+have suffixes bl1 and bl2.  Relevance judgements in relational form
+are in *.rel.
+
+"crandh.rel" is a revised version of the Cranfield relevance judgments
+provided by Donna Harman.  See the discussion in "cranread.me".
+
+"cacm.db0" is an extended version of the CACM document collection
+provided by Robert Korfhage; the earlier version used at Cornell and
+other sites is in "cacm.all".  Note that the field marked by ".X" is
+used to give citation related information.
+
+The LISA, RIRD, and TIME directories have readme files describing their
+organization and that of any subdirectories present.
+
+The NPL collection is discussed in:
+  British Library R&D Report No. 5587, New Models in Probabilistic
+  Information Retrieval, C.J.van Rijsbergen, S.E. Robertson, M.F. Porter,
+  Univ. of Cambridge, 1980
+"The original data for this came from the National Physical Laboratory
+where, in the sixties, Vaswani and Cameron had created a machine
+readable set of abstracts, queries and relevance assessments.  The
+original data and some of the problems it presented in processing are
+described in Chapter 1.  ..."  A letter from Professor Keith Van
+Rijsbergen indicates that the collection was built by him with the
+assistance of a research assistant at Cambridge, with British Library
+funding.
+
+Contact: Dr. Edward A. Fox, VPI&SU.
+-----------------------------------------------------------------------

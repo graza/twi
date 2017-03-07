@@ -1,0 +1,165 @@
+#default_ct=3;
+#ct_spec,author=0,0;
+#ct_spec,year=2,0;
+
+#q1= #or (#and('ibm', 'tss'), #and('ibm','time','sharing','system'));
+#q2= #or ('author.prieve, b', 'author.pooch, u');
+#q3= #and('intermediate', 'languages', 'multi', 'targeted', 'compilers');
+#q4= #and( 'communication',
+	   #or('disjoint', 'distributed'), 'processes');
+#q5= #and( #or( 'design', 'implementation'),
+	   #or( 'human', 'satisfaction', 'user'));
+#q6= #and( #or( 'robotics', #and('motion', 'planning')),
+	   #not( #and( 'dynamics', 'arm', 'motion')));
+#q7= #and( 'concurrent', 'programs', 'message', 'passing', 'fault', 'tolerance');
+#q8= #and( 'resource', 'addressing', 'network');
+#q9= #and( 'security', #or( #and( 'local', 'network'),
+			    #and( 'network', 'operating', 'system'),
+			    #and( 'distributed', 'system')));
+#q10= #and( 'languages', #or( 'parallel', #and( 'parallel', 'computation')));
+#q11= #or( 'setl', #and( 'very', 'high', 'level', 'languages'));
+#q12= #and( 'portable', 'operating', 'system');
+#q13= #and('code', 'optimization', 'space', 'efficiency');
+#q14= #and( 'implementation', 'database', 'management', 'sort', 'algorithms');
+#q15= #and( 'horizontal', 'microcode', 'optimization');
+#q16= #and( 'file', 'handling', 'message', 'passing', 'distributed', 'systems');
+#q17= #and( 'optimization', #or( 'intermediate', 'machine'), 'code');
+#q18= #and( #or( 'languages', 'compilers'), 'parallel', 'processors');
+#q19= #and( 'parallel', 'algorithms');
+#q20= #and( 'graph', 'theoretic', 'algorithm', 'sparse', 'matrices');
+#q21= #and( #or( 'complexity', 'intractability', 'reductions'), 'efficiency');
+#q22= #and( 'graphics',
+	    'hidden',
+		#or( 'line', 'surface'),
+		#or( 'algorithms', 'cylinders', 'spheres', 'cones'));
+#q23= #and( 'distributed', 'structures', 'algorithms');
+#q24= #and( 'applied', 'stochastic', 'processes');
+#q25= #and( 'performance', #or( 'evaluation', 'modelling'));
+#q26= #and( 'concurrency', 'control', 'operating', 'systems');
+#q27= #and( 'memory', 'management', 'operating', 'systems');
+#q28= #and( 'packet', #or( 'network', 'routing'), #not( 'hardware'));
+#q29= #or( #and( 'prime', 'number', 'series', 'algorithms'),
+	   #and( 'sieve', 'algorithm'),
+	   #and('chinese', 'remainder', 'theorem', 'algorithm'));
+#q30= #and( 'text', 'formatting', 'system');
+#q31= #and( 'digital', 'image', 'processing', 'decomposition');
+#q32= #and( 'graph', 'algorithms', 'decomposition', 'heuristic',
+				   #or( 'coloring', 'isomorphism'));
+#q33= #and( #or( 'error', 'sensitivity'),
+	    #or( 'real', 'zero-one'),
+	    'eigenvalue', 'matrices');
+#q34= #and( #or( 'isolation', 'computation'), 'root', 'polynomial');
+#q35= #and( 'probabilistic', 'algorithm',
+	    #or( 'algebraic', 'symbolic'),
+	    'manipulation');
+#q36= #and( #or( 'fast', 'efficient'),
+	    'algorithm', 'context-free', 'language',
+	    #or( 'parsing', 'recognition'));
+#q37= #and( 'data', 'types', 
+	    #or( 'concurrency',
+		 #and( 'message', 'passing'),
+		 'stream', 'messages'));
+#q38= #and( #not( 'data' ), 'type', #or( 'module', 'context'));
+#q39= #and( 'abstract', 'data', 'type', 'compatability',
+	    'programmer', 'defined');
+#q40= #and( 'data', 'types',
+	    #or( 'pascal', 'clu', 'alphard', 'russell', 'ada',
+		 'algol',  'el1'),
+	    'language');
+#q41= #and( 'theory', 'distributed', #or( 'systems', 'databases'),
+	    #or( 'reliability',
+		 #and( 'fault', 'tolerance'),
+		 'atomicity', 'transactions',
+		 #and( 'synchronization', 'algorithms'),
+		 #and( 'resource', 'allocation'), 
+		 #and( #or( #and( 'lower', 'bounds'), 'models'),
+		       'asynchronous', 'parallel', 'systems'),
+		 #and( 'communicating', #or( 'processes', 'protocols'))
+	       ));
+#q42= #and( 'computer', 'performance', 'evaluation', 'techniques',
+	    #or( #and( 'pattern', 'recognition'), 'clustering' ) );
+#q43= #and( 'shape', #or( 'human', 'computer'),
+	    #or( 'analysis', 'perception', 'description', 'recognition',
+		 #and( 'circularity', 'measures'), 'matching' ));
+#q44= #and( 'texture', #or( 'analysis', 'synthesis', 'perception') );
+#q45= #and( 'optimize', 'information', 'system', 'performance',
+	    #or( #and( 'secondary', 'index', 'selection'),
+		 #and( 'file', 'reorganization'),
+		 #and( 'distributed', 'databases'),
+		 'models') );
+#q46= #and( 'set', 'theory',
+	    #or( 'clustering', #and( 'information', 'retrieval'),
+		 #and( 'performance', 'evaluation'),
+		 #and( 'automatic', 'indexing') 
+	       ));
+#q47= #and( 'probabilistic models', 'optimize', 
+	    'information', 'retrieval', #or( 'system', 'search') );
+#q48= #and( 'generating', 'optimization', 'algorithms',
+	    #or( #and( 'data', 'structures'),
+		 #and( 'numerical', 'methods'),
+		 'ellipsoidal', 'complexity') );
+#q49= #and( 'role', 'information', 'retrieval',
+	    #or( #and( 'knowledge', 'based'), 'expert'), 'systems');
+#q50= #and( 'parallel', 'processors', 'information', 'retrieval', 'systems');
+#q51= #and( 'parallel', 'processors', 'paging', 'algorithms');
+#q52= #and( #or( 'modelling', 'simulation'), 'ecosystems');
+#q53= #and( 'applications', 'discrete', 'mathematics',
+	    #or( #and( 'mathematical', 'induction'),
+		 #and( 'group', 'theory'),
+		 #and( 'integers', 'modulo'),
+		 'probability',
+		 #and( 'binomial', 'coefficients'),
+		 #and( 'binomial', 'theorem'),
+		 'substitutions', 'mapping functions', 
+		 'transitivity', 'relations',
+		 #and( 'relation', 'matrix')
+	       ) );
+#q54= #and( 'semantics', 'programming', 'languages',
+	    #or( #and( 'abstract', 'specification', 'data', 'types'),
+		 #and( 'denotational', 'semantics'),
+		 #and( 'proofs', 'correctness'),
+		 'author.hoare, c', 'author.dijkstra, e') );
+#q55= #and( 'star', 'height', 'regular',
+	    #or( 'languages', 'expressions', 'events') );
+#q56= #and( 'algebraic', 'theory', 
+	    #or( 'automata', #and( 'regular', 'languages')) );
+#q57= #or( #and( 'author.backus, j', 'year.1978'),
+	   #and( 'author.de_millo, r', 'author.lipton, r', 'year.1979') );
+#q58= #and( 'statistical', #or( 'algorithms', 'packages'),
+	    #or( 'least squares', 
+		 #and( 'generalized', 'linear', 'models')),
+	    #or( #and( 'system', 'design'),
+		     'capabilities', 'equations', 
+		 #and( 'significance', 'tests'),
+		 #and( 'sign', 'tests')) );
+#q59= #and( 'dictionary', 'construction',
+	    'accessing', 'methods',
+	    'fast', 'retrieval',
+	    #or( 'words',
+		 #and( 'lexical', 'items'),
+		 #and( 'related', 'information'),
+		 #and( #or( 'hashing', 'indexing'),
+		       #or( 'spelling', #and( 'natural', 'language'))
+		     ) ) );
+#q60= #and( #or( 'hardware', 'software'),
+	    #or( #and( 'database', 'management', 'systems'),
+		 #and( 'database', 'packages'),
+		 #and( 'back', 'end', 'computers'),
+		 #and( 'special', 'associative', 'hardware'),
+		 #and( 'microcomputers', 'disk', 'heads'),
+		 #and( 'relational', 'models'),
+		 #and( #or( 'network', 'codasyl'), 'hierarchical', 'models'),
+		 #and( 'associative', 'processing')));
+#q61= #and( 'information', 'retrieval',
+	    #or( 'clustering',
+		 #and( 'bibliographic', 'coupling'),
+		 'citations', 
+		 #and( 'vector', 'space', 'model'), 
+		 #and( 'boolean', 'search', #or( #and( 'inverted', 'files'),
+						'feedback')),
+		 'author.salton, g'));
+#q62= #and( 'relating', 'parallel', 'complexity', 'measures');
+#q63= #and( 'algorithms', 'parallel', 'computation', 
+	    #or( 'comparisons', 'sequential', 'algorithms'));
+#q64= #and( 'el1', 'language' );
+#endcoll;

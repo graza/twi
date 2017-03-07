@@ -4,7 +4,11 @@
 	"description": "The Wikipedia Index",
 	"author": "Graham Agnew <graham.agnew@gmail.com>",
 	"main": "worker.js",
-	"license": "GPL",
+	"license": "GPL-3.0",
+	"repository": {
+		"type": "git",
+		"url": "git@github.com:graza/twi.git"
+	},
 	"scripts": {
 		"start": "node worker.js"
 	},

@@ -1,4 +1,4 @@
-'use strict;'
+'use strict';
 
 /* TWI - The Wikipedia Index
  * Copyright (C) Graham Agnew 2016
@@ -19,17 +19,21 @@
  */
 
 // Load libraries
+const Readline = require('readline');
+const Fs = require('fs');
 const MediaWiki = require('mediawiki');
 const Redis = require('redis');
 const WF = require('word-freq');
 const Bluebird = require('bluebird');
+
+const Redishost = 'redis';
 
 // Add promises to Redis
 Bluebird.promisifyAll(Redis.RedisClient.prototype);
 Bluebird.promisifyAll(Redis.Multi.prototype);
 
 // Initialise globals
-var redis = Redis.createClient({host: "redis"});
+var redis = Redis.createClient({host: Redishost});
 redis.on("error", (err) => {
 	console.log("Error " + err);
 });
@@ -129,12 +133,12 @@ function processpage(pageid, text) {
 	promises.push(redis.setAsync("page:" + pageid + ":text", text));
 	//promises.push(redis.saddAsync("page:" + pageid + ":terms", Object.keys(freq.terms)));
 	//promises.push(redis.saddAsync("page:" + pageid + ":edges", Object.keys(freq.bigrams)));
-	for (t in freq.terms) {
+	for (let t in freq.terms) {
 		promises.push(redis.zaddAsync("term:" + t, freq.terms[t], pageid));
 		//promises.push(redis.incrAsync("cterm:" + t));
 		dl += freq.terms[t];
 	}
-	for (t in freq.bigrams) {
+	for (let t in freq.bigrams) {
 		promises.push(redis.zaddAsync("term:" + t, freq.bigrams[t], pageid));
 		//promises.push(redis.incrAsync("cterm:" + t));
 		//dl += freq.bigrams[t];
@@ -148,6 +152,7 @@ function processpage(pageid, text) {
 
 // Find and rank documents
 function finddocs(query, termw, edgew) {
+	var starttime = process.hrtime();
 	//var freq = WF.freq(query);
 	var freq = frequencies(query);
 	//console.log(`freq = ${JSON.stringify(freq)}, termw = ${termw}, edgew = ${edgew}`);
@@ -233,7 +238,7 @@ function finddocs(query, termw, edgew) {
 			var term = t[0];
 			var weights = t[1];
 			//console.log(`\nterm = ${term}\nweights = ${JSON.stringify(weights)}`);
-			for (page of weights) {
+			for (let page of weights) {
 				var pageid = page[0];
 				var weight = page[1];
 				var thisweight = 0;
@@ -257,32 +262,114 @@ function finddocs(query, termw, edgew) {
 			return sim[b] - sim[a];
 		});
 		var pageweights = [];
-		for (pageid of pageids) {
+		for (let pageid of pageids) {
 			pageweights.push([pageid, sim[pageid]]);
 		}
+		var diff = process.hrtime(starttime);
 		return {
+			time: (diff[0]*1e9 + diff[1])/1e6,
 			freq: freq,
 			pageids: pageweights
 		};
 	});
 }
 
+function handleEntry(mode, index, text) {
+	switch (mode) {
+	case 'load':
+		return redis.lpushAsync('worker', JSON.stringify(['processpage', index, text]));
+		break;
+	case 'query':
+		return finddocs(text, 1.0, 0.8).then((docs) => {
+			var pages = docs; //.sort((a,b) => { return a - b; });
+			for (let pageid of pages) {
+				console.log(`${index} 0 ${pageid} 1`);
+			}
+		}) ;
+		break;
+	}
+}
+
+function processFile(mode, file) {
+	return new Promise((resolve, reject) => {
+		var rs = Fs.createReadStream(file);
+		var rl = Readline.createInterface({ input: rs });
+
+		var promises = [];
+		var index = '';
+		var text = '';
+		var title = '';
+		var state = '';
+		rl.on('line', (line) => {
+			var input = line.match(/^\.([A-Z]{1})(?: (\d+))?/);
+			if (input) {
+				state = input[1];
+				console.log(`new state ${input}  = ${state}`);
+				if (state == 'I') {
+					// If text has been read, process it
+					if (text.length > 0 || title.length > 0) {
+						//console.log(`Read for index ${index}: ${text.split(/\s*(\.)\.*\s*|\s+/)}`);
+						console.log(`pushing work ${text.length}`);
+						promises.push(handleEntry(mode, index, title + text));
+						text = '';
+						title = '';
+					}
+					index = input[2];
+				}
+			}
+			else {
+				switch (state) {
+				case 'W':
+					// Append the line to the text buffer, making sure there's a space at the end
+					text += line + ' ';
+					break;
+				case 'T':
+					title += line + ' ';
+					break;
+				}
+			}
+		});
+		rl.on('close', () => {
+			if (text.length > 0 || title.length > 0) {
+				promises.push(handleEntry(mode, index, title + text));
+				//console.log(`Read for index ${index}: ${text.split(/\s*(\.)\.*\s*|\s+/)}`);
+			}
+			console.log(`end of file ${file} reached`);
+			Promise.all(promises)
+			.then(() => { 
+				console.log(`resolving ${mode} promise with ${promises.length}`);
+				resolve(promises.length);
+			});		
+		});
+	});
+}
+
 // We use a separate client for the command queue
 // This is because it's a blocking operation and can't be
 // run in conjunction with other Redis commands.
-var redisq = Redis.createClient({host: "redis"});
+// TODO - Can remove this since promises are used everywhere?
+var redisq = Redis.createClient({host: Redishost});
 redisq.on("error", (err) => {
 	console.log("Error " + err);
 });
 
 function server(queue) {
 	//console.log('listening on queue ' + queue);
-	redisq.brpopAsync(queue, 0)
+	return redisq.brpopAsync(queue, 0)
 	.then((msg) => {
 		//console.log(msg);
-		req = JSON.parse(msg[1]);
+		var req = JSON.parse(msg[1]);
 		var p = undefined;
 		switch (req[0]) {
+		case 'load':
+			p = redis.flushdbAsync()
+			.then(() => {
+				return processFile('load', 'ircolls/' + req[2]);
+			})
+			.then((docs) => {
+				return redis.lpushAsync(req[1], JSON.stringify([docs]));
+			});
+			break;
 		case 'getlinks':
 			p = getlinks(req[1]);
 			break;
@@ -306,19 +393,19 @@ function server(queue) {
 			return server(queue);
 		}
 		p.then(() => {
-			server(queue);
+			return server(queue);
 		});
 	})
 	.catch((err) => {
 		console.error(err);
-		server(queue);
+		return server(queue);
 	});
 }
 server('worker');
 console.log('worker started'); 
 
 // Example query to get the top 1000 articles
-query = ['getlinks', {
+var query = ['getlinks', {
 	action: "query", 
 	generator: "links",
 	titles: "Wikipedia:Vital_articles",

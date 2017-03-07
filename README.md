@@ -27,7 +27,7 @@ At the moment I start the Docker containers using the docker-compose.yml file:
 > docker-compose up
 ```
 
-And then I run these three commands:
+And then I run these commands:
 
 ```
 > cd worker
